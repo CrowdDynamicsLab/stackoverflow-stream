@@ -54,6 +54,11 @@ struct archive_file
         }
     }
 
+    ~archive_file()
+    {
+        archive_read_close(a_);
+    }
+
     operator archive*()
     {
         return a_;
