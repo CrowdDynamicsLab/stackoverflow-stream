@@ -27,3 +27,5 @@ StackOverflow itself is a special little snowflake since they decided to
 split its archive up into separate files. You'll have to do some post
 cleanup for that one community (not really worth adding as a special case
 to `repack`).
+
+[meta]: https://github.com/meta-toolkit/meta
