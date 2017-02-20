@@ -6,13 +6,16 @@
  * dump.
  */
 
+#include <fstream>
 #include <iostream>
 #include <libxml/xmlreader.h>
 
 #include "meta/hashing/probe_map.h"
 #include "meta/io/filesystem.h"
+#include "meta/io/packed.h"
 #include "meta/io/xzstream.h"
 #include "meta/logging/logger.h"
+#include "meta/util/array_view.h"
 #include "meta/util/identifiers.h"
 #include "meta/util/progress.h"
 
@@ -104,7 +107,8 @@ class xml_text_reader
                 self->input_.read(buffer, len);
 
                 auto num_read = static_cast<int>(self->input_.gcount());
-                self->progress_(static_cast<uint64_t>(num_read));
+                self->total_read_ += static_cast<uint64_t>(num_read);
+                self->progress_(self->total_read_);
                 return num_read;
             },
             // Close callback
@@ -120,6 +124,7 @@ class xml_text_reader
     }
 
     std::istream& input_;
+    uint64_t total_read_ = 0;
     printing::progress& progress_;
     xmlTextReaderPtr reader_;
 };
@@ -140,16 +145,26 @@ action_id get_action_id(util::string_view name)
     throw std::runtime_error{"unrecognized action: " + name.to_string()};
 }
 
+std::time_t parse_date(const std::string& date)
+{
+    std::tm t = {};
+    std::stringstream ss{date};
+
+    ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S");
+
+    return ::timegm(&t);
+}
+
 struct action
 {
     action(util::string_view name, const std::string& d)
-        : id{get_action_id(name)}, date{d}
+        : id{get_action_id(name)}, date{parse_date(d)}
     {
         // nothing
     }
 
     action_id id;
-    std::string date;
+    std::time_t date;
 };
 
 bool operator<(const action& a, const action& b)
@@ -303,6 +318,39 @@ void extract_post_history(const std::string& folder, ActionMap& actions)
     LOG(progress) << "\rFound " << num_actions << " history actions\n" << ENDLG;
 }
 
+void write_sequences(std::ostream& out, const std::vector<action>& actions)
+{
+    auto six_hours = 60 * 60 * 6;
+    const action* begin = &actions[0];
+    const action* last = begin;
+
+    std::vector<util::array_view<const action>> sequences;
+    for (const auto& act : actions)
+    {
+        if (act.date - last->date > six_hours)
+        {
+            last = &act;
+            sequences.emplace_back(begin, last);
+            begin = last;
+        }
+        else
+        {
+            last = &act;
+        }
+    }
+    sequences.emplace_back(begin, last + 1);
+
+    io::packed::write(out, sequences.size());
+    for (const auto& av : sequences)
+    {
+        io::packed::write(out, av.size());
+        for (const auto& act : av)
+        {
+            io::packed::write(out, act.id);
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     if (argc != 2)
@@ -329,6 +377,15 @@ int main(int argc, char** argv)
     extract_comments(folder, actions);
     extract_posts(folder, actions);
     extract_post_history(folder, actions);
+
+    std::ofstream sequences{"sequences.bin", std::ios::binary};
+    io::packed::write(sequences, actions.size());
+    for (auto& pr : actions)
+    {
+        std::sort(pr.value().begin(), pr.value().end());
+
+        write_sequences(sequences, pr.value());
+    }
 
     return 0;
 }
