@@ -34,8 +34,7 @@ class xml_string
         ::free(str_);
     }
 
-    xml_string(xml_string&& other)
-      : str_(other.str_)
+    xml_string(xml_string&& other) : str_(other.str_)
     {
         other.str_ = nullptr;
     }
@@ -51,6 +50,11 @@ class xml_string
     xml_string& operator=(const xml_string&) = delete;
 
     std::string to_string() const
+    {
+        return {(const char*)str_};
+    }
+
+    util::string_view sv() const
     {
         return {(const char*)str_};
     }
@@ -164,6 +168,7 @@ void extract_comments(const std::string& folder, ActionMap& actions)
     io::xzifstream input{filename};
     xml_text_reader reader{input, progress};
 
+    uint64_t num_actions = 0;
     while (reader.read_next())
     {
         auto node_name = reader.node_name();
@@ -183,8 +188,51 @@ void extract_comments(const std::string& folder, ActionMap& actions)
 
         user_id user{std::stoul(uid->to_string())};
         actions[user].emplace_back("comment", dte->to_string());
+
+        ++num_actions;
     }
-    return;
+    progress.end();
+    LOG(progress) << "\rFound " << num_actions << " comments\n" << ENDLG;
+}
+
+template <class ActionMap>
+void extract_posts(const std::string& folder, ActionMap& actions)
+{
+    auto filename = folder + "/Posts.xml.xz";
+
+    printing::progress progress{" > Extracting Posts: ",
+                                filesystem::file_size(filename)};
+
+    io::xzifstream input{filename};
+    xml_text_reader reader{input, progress};
+
+    uint64_t num_actions = 0;
+    while (reader.read_next())
+    {
+        auto node_name = reader.node_name();
+
+        if (node_name == "posts")
+            continue;
+
+        if (node_name != "row")
+            throw std::runtime_error{"unrecognized XML entity "
+                                     + node_name.to_string()};
+
+        auto post_type = reader.attribute("PostTypeId");
+        auto date = reader.attribute("CreationDate");
+        auto uid = reader.attribute("OwnerUserId");
+
+        if (!post_type || !date || !uid)
+            continue;
+
+        user_id user{std::stoul(uid->to_string())};
+        actions[user].emplace_back((post_type->sv() == "1") ? "post question"
+                                                            : "post answer",
+                                   date->to_string());
+        ++num_actions;
+    }
+    progress.end();
+    LOG(progress) << "\rFound " << num_actions << " posts\n" << ENDLG;
 }
 
 int main(int argc, char** argv)
@@ -211,10 +259,10 @@ int main(int argc, char** argv)
 
     hashing::probe_map<user_id, std::vector<action>> actions;
     extract_comments(folder, actions);
+    extract_posts(folder, actions);
 #if 0
-    extract_posts(folder);
-    extract_post_history(folder);
-    extract_post_links(folder);
+    extract_post_history(folder, actions);
+    extract_post_links(folder, actions);
 #endif
 
     return 0;
