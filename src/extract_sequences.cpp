@@ -15,6 +15,7 @@
 #include "meta/io/packed.h"
 #include "meta/io/xzstream.h"
 #include "meta/logging/logger.h"
+#include "meta/stats/running_stats.h"
 #include "meta/util/array_view.h"
 #include "meta/util/identifiers.h"
 #include "meta/util/progress.h"
@@ -318,7 +319,15 @@ void extract_post_history(const std::string& folder, ActionMap& actions)
     LOG(progress) << "\rFound " << num_actions << " history actions\n" << ENDLG;
 }
 
-void write_sequences(std::ostream& out, const std::vector<action>& actions)
+struct sequence_stats
+{
+    stats::running_stats sequence_length;
+    stats::running_stats num_sequences;
+    stats::running_stats gap_length;
+};
+
+void write_sequences(std::ostream& out, const std::vector<action>& actions,
+                     sequence_stats& stats)
 {
     auto six_hours = 60 * 60 * 6;
     const action* begin = &actions[0];
@@ -327,6 +336,9 @@ void write_sequences(std::ostream& out, const std::vector<action>& actions)
     std::vector<util::array_view<const action>> sequences;
     for (const auto& act : actions)
     {
+        if (&act != last)
+            stats.gap_length.add(act.date - last->date);
+
         if (act.date - last->date > six_hours)
         {
             last = &act;
@@ -340,9 +352,11 @@ void write_sequences(std::ostream& out, const std::vector<action>& actions)
     }
     sequences.emplace_back(begin, last + 1);
 
+    stats.num_sequences.add(sequences.size());
     io::packed::write(out, sequences.size());
     for (const auto& av : sequences)
     {
+        stats.sequence_length.add(av.size());
         io::packed::write(out, av.size());
         for (const auto& act : av)
         {
@@ -378,14 +392,22 @@ int main(int argc, char** argv)
     extract_posts(folder, actions);
     extract_post_history(folder, actions);
 
+    sequence_stats stats;
     std::ofstream sequences{"sequences.bin", std::ios::binary};
     io::packed::write(sequences, actions.size());
     for (auto& pr : actions)
     {
         std::sort(pr.value().begin(), pr.value().end());
 
-        write_sequences(sequences, pr.value());
+        write_sequences(sequences, pr.value(), stats);
     }
+
+    LOG(info) << "Sequence length: " << stats.sequence_length.mean() << " +/- "
+              << stats.sequence_length.stddev() << ENDLG;
+    LOG(info) << "Gap length: " << stats.gap_length.mean() << " +/- "
+              << stats.gap_length.stddev() << ENDLG;
+    LOG(info) << "Num sequences/user: " << stats.num_sequences.mean() << " +/- "
+              << stats.num_sequences.stddev() << ENDLG;
 
     return 0;
 }

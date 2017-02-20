@@ -16,6 +16,6 @@ target_link_libraries(repack meta-io ${LibArchive_LIBRARIES})
 target_include_directories(repack PRIVATE ${LibArchive_INCLUDE_DIRS})
 
 add_executable(extract-sequences src/extract_sequences.cpp)
-target_link_libraries(extract-sequences meta-io ${LIBXML2_LIBRARIES})
+target_link_libraries(extract-sequences meta-io meta-stats ${LIBXML2_LIBRARIES})
 target_include_directories(extract-sequences PRIVATE ${LIBXML2_INCLUDE_DIR})
 target_compile_definitions(extract-sequences PRIVATE ${LIBXML2_DEFINITIONS})
