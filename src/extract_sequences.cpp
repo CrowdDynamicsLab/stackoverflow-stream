@@ -235,6 +235,74 @@ void extract_posts(const std::string& folder, ActionMap& actions)
     LOG(progress) << "\rFound " << num_actions << " posts\n" << ENDLG;
 }
 
+template <class ActionMap>
+void extract_post_history(const std::string& folder, ActionMap& actions)
+{
+    auto filename = folder + "/PostHistory.xml.xz";
+
+    printing::progress progress{" > Extracting PostHistory: ",
+                                filesystem::file_size(filename)};
+
+    auto action_name = [](uint64_t history_type_id) {
+        switch (history_type_id)
+        {
+            case 1:
+            case 2:
+            case 3:
+                return "init";
+            case 4:
+            case 7:
+                return "edit title";
+            case 5:
+            case 8:
+                return "edit body";
+            case 6:
+            case 9:
+                return "edit tags";
+            case 10:
+            case 11:
+            case 12:
+            case 13:
+                return "mod vote";
+            default:
+                return "mod action";
+        }
+    };
+
+    io::xzifstream input{filename};
+    xml_text_reader reader{input, progress};
+
+    uint64_t num_actions = 0;
+    while (reader.read_next())
+    {
+        auto node_name = reader.node_name();
+
+        if (node_name == "posthistory")
+            continue;
+
+        if (node_name != "row")
+            throw std::runtime_error{"unrecognized XML entity "
+                                     + node_name.to_string()};
+
+        auto uid = reader.attribute("UserId");
+        auto type = reader.attribute("PostHistoryTypeId");
+        auto date = reader.attribute("CreationDate");
+
+        if (!uid || !type || !date)
+            continue;
+
+        user_id user{std::stoul(uid->to_string())};
+        auto type_num = std::stoul(type->to_string());
+        auto aname = action_name(type_num);
+        if (aname == "init")
+            continue;
+        actions[user].emplace_back(aname, date->to_string());
+        ++num_actions;
+    }
+    progress.end();
+    LOG(progress) << "\rFound " << num_actions << " history actions\n" << ENDLG;
+}
+
 int main(int argc, char** argv)
 {
     if (argc != 2)
@@ -260,8 +328,8 @@ int main(int argc, char** argv)
     hashing::probe_map<user_id, std::vector<action>> actions;
     extract_comments(folder, actions);
     extract_posts(folder, actions);
-#if 0
     extract_post_history(folder, actions);
+#if 0
     extract_post_links(folder, actions);
 #endif
 
