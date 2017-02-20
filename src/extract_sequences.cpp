@@ -70,7 +70,7 @@ class xml_string
 class xml_text_reader
 {
   public:
-    xml_text_reader(std::istream& input, printing::progress& progress)
+    xml_text_reader(io::xzifstream& input, printing::progress& progress)
         : input_(input), progress_(progress), reader_{make_xml_reader()}
     {
     }
@@ -108,8 +108,7 @@ class xml_text_reader
                 self->input_.read(buffer, len);
 
                 auto num_read = static_cast<int>(self->input_.gcount());
-                self->total_read_ += static_cast<uint64_t>(num_read);
-                self->progress_(self->total_read_);
+                self->progress_(self->input_.bytes_read());
                 return num_read;
             },
             // Close callback
@@ -124,8 +123,7 @@ class xml_text_reader
             XML_PARSE_NONET | XML_PARSE_NOBLANKS | XML_PARSE_RECOVER);
     }
 
-    std::istream& input_;
-    uint64_t total_read_ = 0;
+    io::xzifstream& input_;
     printing::progress& progress_;
     xmlTextReaderPtr reader_;
 };
