@@ -314,8 +314,8 @@ int main(int argc, char** argv)
     logging::set_cerr_logging();
 
     std::string folder{argv[1]};
-    for (const auto& name : {"Comments.xml.xz", "Posts.xml.xz",
-                             "PostHistory.xml.xz", "PostLinks.xml.xz"})
+    for (const auto& name :
+         {"Comments.xml.xz", "Posts.xml.xz", "PostHistory.xml.xz"})
     {
         if (!filesystem::file_exists(folder + "/" + name))
         {
@@ -329,9 +329,6 @@ int main(int argc, char** argv)
     extract_comments(folder, actions);
     extract_posts(folder, actions);
     extract_post_history(folder, actions);
-#if 0
-    extract_post_links(folder, actions);
-#endif
 
     return 0;
 }
