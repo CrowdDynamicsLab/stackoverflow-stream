@@ -31,7 +31,6 @@ cleanup for that one community (not really worth adding as a special case
 to `repack`).
 
 ## `extract-sequences` tool
-(BEING WRITTEN)
 
 The `extract-sequences` tool is designed to extract action sequences from a
 repacked StackExchange community dump. It currently extracts the following
@@ -49,5 +48,44 @@ action types (listed below with their id):
 Every user is associated with their list of actions, which is then sorted
 by timestamp. These are then further decomposed into "sessions" by grouping
 all consecutive actions that have a gap of less than 6 hours between them.
+
+The output is written to `sequences.bin` in the current working directory.
+
+## `cluster-sequences` tool
+
+The `cluster-sequences` tool runs the actual two-layer hidden Markov model
+on the extracted sequences from the previous step. It is invoked with the
+path to `sequences.bin` and a number of states as its two command line
+arguments and writes out the HMM model file to `hmm-model.bin` in the
+current working directory.
+
+## `print-hmm` and `plot_X.py` tools
+
+First, install the required libraries for the Python code (see
+`scripts/requirements.txt`). Then, plots of the distributions learned by
+the two-layer hidden Markov model can be created by using
+
+```bash
+../build/print-hmm json ../build/hmm-model.bin | python plot_models.py
+```
+
+and
+
+```bash
+../build/print-hmm json-trans ../build/hmm-model.bin | python plot_trans.py
+```
+
+These two scripts will create files `stateX.png` and `trans.png` in the
+current working directory. Each of the `stateX.png` files reflects the
+observation distribution (in the form of a Markov model) for that latent
+state id. Node sizes are determined based on their personalized PageRank
+score (with the personalization vector equal to the initial probability
+according to the Markov model), and edge widths leaving a node are
+determined based on the conditional probability of taking that edge given
+that a random walk is currently at that node.
+
+Similarly, the `trans.png` file depicts the transition matrix between each
+of the latent states. Node sizes and edge widths are set using the same
+strategy detailed above.
 
 [meta]: https://github.com/meta-toolkit/meta
