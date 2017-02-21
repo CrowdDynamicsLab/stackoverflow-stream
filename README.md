@@ -59,6 +59,12 @@ path to `sequences.bin` and a number of states as its two command line
 arguments and writes out the HMM model file to `hmm-model.bin` in the
 current working directory.
 
+The model is fit using the EM algorithm from a random starting point. This
+will take some time, but the algorithm's E-step is fully parallelized. Each
+iteration takes approximately 13 seconds on my desktop machine, and by
+default the algorithm will run for 50 iterations or until the relative
+change in log likelihood falls below 1e-4, whichever comes first.
+
 ## `print-hmm` and `plot_X.py` tools
 
 First, install the required libraries for the Python code (see
