@@ -33,8 +33,12 @@ to `repack`).
 ## `extract-sequences` tool
 
 The `extract-sequences` tool is designed to extract action sequences from a
-repacked StackExchange community dump. It currently extracts the following
-action types (listed below with their id):
+repacked StackExchange community dump. Have a look at the [StackExchange
+data dump readme][stackexchange-readme] for more info about the things I'm
+referring to below (like `PostHistoryTypeId`).
+
+It currently extracts the following action types (listed below with their
+id):
 
 1. post question
 2. post answer
@@ -95,3 +99,4 @@ of the latent states. Node sizes and edge widths are set using the same
 strategy detailed above.
 
 [meta]: https://github.com/meta-toolkit/meta
+[stackexchange-readme]: https://ia600500.us.archive.org/22/items/stackexchange/readme.txt
