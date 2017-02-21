@@ -3,8 +3,8 @@
  * Prints the distributions for a HMM model file.
  */
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
 
 #include "json.hpp"
 
@@ -109,8 +109,9 @@ int main(int argc, char** argv)
                 trans.push_back(hmm.trans_prob(i, j));
             }
 
-            arr.push_back(
-                {{"name", i}, {"init", hmm.init_prob(i)}, {"edges", trans}});
+            arr.push_back({{"name", static_cast<uint64_t>(i)},
+                           {"init", hmm.init_prob(i)},
+                           {"edges", trans}});
         }
         std::cout << arr << "\n";
     }
