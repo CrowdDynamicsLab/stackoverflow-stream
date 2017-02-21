@@ -16,17 +16,6 @@
 
 using namespace meta;
 
-util::string_view action_name(sequence::state_id aid)
-{
-    static util::string_view actions[]
-        = {"post question", "post answer", "comment",  "edit title",
-           "edit body",     "edit tags",   "mod vote", "mod action"};
-
-    if (aid > sizeof(actions))
-        throw std::out_of_range{"invalid action id " + std::to_string(aid)};
-    return actions[static_cast<std::size_t>(aid)];
-}
-
 int main(int argc, char** argv)
 {
     if (argc != 3)
