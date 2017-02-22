@@ -98,5 +98,13 @@ Similarly, the `trans.png` file depicts the transition matrix between each
 of the latent states. Node sizes and edge widths are set using the same
 strategy detailed above.
 
+## `print-sequences` tool
+
+The `print-sequences` tool converts the MeTA `io::packed` format
+`sequences.bin` file to a JSON file. The format is an array of users, each
+of which is an array of sessions, which are themselves arrays of action ids
+(numbers). The numbers correspond to the list items in the
+[extract-sequences](#extract-sequences-tool) section.
+
 [meta]: https://github.com/meta-toolkit/meta
 [stackexchange-readme]: https://ia600500.us.archive.org/22/items/stackexchange/readme.txt

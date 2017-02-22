@@ -26,3 +26,7 @@ target_link_libraries(cluster-sequences meta-sequence meta-hmm)
 add_executable(print-hmm src/print_hmm.cpp)
 target_link_libraries(print-hmm meta-sequence meta-hmm)
 target_include_directories(print-hmm PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
+add_executable(print-sequences src/print_sequences.cpp)
+target_link_libraries(print-sequences meta-io)
+target_include_directories(print-sequences PRIVATE ${PROJECT_SOURCE_DIR}/include)
