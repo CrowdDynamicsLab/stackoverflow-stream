@@ -13,6 +13,15 @@ extracted from StackExchange data dumps.
   should detect it for you without having to install it. You will need to
   build with liblzma support for `meta::io::xz{i,o}fstream` support.
 
+## Building
+
+```bash
+mkdir build
+cd build
+cmake .. -DCMAKE_BUILD_TYPE=Release
+make
+```
+
 ## `repack` tool
 The `repack` executable is designed to get the StackExchange data dumps
 into a format that is more amenable to processing using standard Unix
