@@ -47,16 +47,14 @@ data dump readme][stackexchange-readme] for more info about the things I'm
 referring to below (like `PostHistoryTypeId`).
 
 It currently extracts the following action types (listed below with their
-id):
+id; see [`include/actions.h`][actions.h]):
 
 1. post question
 2. post answer
 3. comment
-4. edit title (`PostHistoryTypeId`s 4 and 7)
-5. edit body (`PostHistoryTypeId`s 5 and 8)
-6. edit tags (`PostHistoryTypeId`s 6 and 9)
-7. mod vote (`PostHistoryTypeId`s 10-13)
-8. mod action (`PostHistoryTypeId`s 14-22)
+4. edit (`PostHistoryTypeId`s 4-9)
+5. mod vote (`PostHistoryTypeId`s 10-13)
+6. mod action (`PostHistoryTypeId`s 14-22)
 
 Every user is associated with their list of actions, which is then sorted
 by timestamp. These are then further decomposed into "sessions" by grouping
@@ -117,3 +115,4 @@ of which is an array of sessions, which are themselves arrays of action ids
 
 [meta]: https://github.com/meta-toolkit/meta
 [stackexchange-readme]: https://ia600500.us.archive.org/22/items/stackexchange/readme.txt
+[actions.h]: https://github.com/CrowdDynamicsLab/stackoverflow-stream/blob/master/include/actions.h
