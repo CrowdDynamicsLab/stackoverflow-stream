@@ -6,6 +6,7 @@
 #include <fstream>
 #include <iostream>
 
+#include "actions.h"
 #include "json.hpp"
 
 #include "meta/sequence/hmm/hmm.h"
@@ -13,17 +14,6 @@
 
 using namespace nlohmann;
 using namespace meta;
-
-util::string_view action_name(sequence::state_id aid)
-{
-    static util::string_view actions[]
-        = {"post question", "post answer", "comment",  "edit title",
-           "edit body",     "edit tags",   "mod vote", "mod action"};
-
-    if (aid > sizeof(actions))
-        throw std::out_of_range{"invalid action id " + std::to_string(aid)};
-    return actions[static_cast<std::size_t>(aid)];
-}
 
 int main(int argc, char** argv)
 {
@@ -59,7 +49,7 @@ int main(int argc, char** argv)
             std::cout << "Markov Model Initial probs:\n";
             for (state_id init{0}; init < mm.num_states(); ++init)
             {
-                std::cout << "\"" << action_name(init) << "\":\t"
+                std::cout << "\"" << action_name(action_cast(init)) << "\":\t"
                           << mm.initial_probability(init) << "\n";
             }
             std::cout << "\n";
@@ -68,9 +58,9 @@ int main(int argc, char** argv)
             {
                 for (state_id j{0}; j < mm.num_states(); ++j)
                 {
-                    std::cout << action_name(i) << " -> " << action_name(j)
-                              << ": " << mm.transition_probability(i, j)
-                              << "\n";
+                    std::cout << action_name(action_cast(i)) << " -> "
+                              << action_name(action_cast(j)) << ": "
+                              << mm.transition_probability(i, j) << "\n";
                 }
                 std::cout << "\n";
             }
@@ -91,9 +81,10 @@ int main(int argc, char** argv)
                     trans.push_back(mm.transition_probability(i, j));
                 }
 
-                arr.push_back({{"name", action_name(i).to_string()},
-                               {"init", mm.initial_probability(i)},
-                               {"edges", trans}});
+                arr.push_back(
+                    {{"name", action_name(action_cast(i)).to_string()},
+                     {"init", mm.initial_probability(i)},
+                     {"edges", trans}});
             }
             std::cout << arr << "\n";
         }

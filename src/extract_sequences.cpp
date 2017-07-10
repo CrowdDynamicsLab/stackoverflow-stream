@@ -20,7 +20,8 @@
 #include "meta/util/identifiers.h"
 #include "meta/util/progress.h"
 
-MAKE_NUMERIC_IDENTIFIER(action_id, uint8_t)
+#include "actions.h"
+
 MAKE_NUMERIC_IDENTIFIER(user_id, uint64_t)
 
 using namespace meta;
@@ -128,21 +129,6 @@ class xml_text_reader
     xmlTextReaderPtr reader_;
 };
 
-action_id get_action_id(util::string_view name)
-{
-    static util::string_view actions[]
-        = {"post question", "post answer", "comment",  "edit title",
-           "edit body",     "edit tags",   "mod vote", "mod action"};
-
-    action_id aid{0};
-    for (const auto& action : actions)
-    {
-        if (name == action)
-            return aid;
-        ++aid;
-    }
-    throw std::runtime_error{"unrecognized action: " + name.to_string()};
-}
 
 std::time_t parse_date(const std::string& date)
 {
@@ -156,13 +142,13 @@ std::time_t parse_date(const std::string& date)
 
 struct action
 {
-    action(util::string_view name, const std::string& d)
-        : id{get_action_id(name)}, date{parse_date(d)}
+    action(action_type atype, const std::string& d)
+        : type{atype}, date{parse_date(d)}
     {
         // nothing
     }
 
-    action_id id;
+    action_type type;
     std::time_t date;
 };
 
@@ -201,7 +187,7 @@ void extract_comments(const std::string& folder, ActionMap& actions)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
-        actions[user].emplace_back("comment", dte->to_string());
+        actions[user].emplace_back(action_type::POST_COMMENT, dte->to_string());
 
         ++num_actions;
     }
@@ -240,8 +226,9 @@ void extract_posts(const std::string& folder, ActionMap& actions)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
-        actions[user].emplace_back((post_type->sv() == "1") ? "post question"
-                                                            : "post answer",
+        actions[user].emplace_back((post_type->sv() == "1")
+                                       ? action_type::POST_QUESTION
+                                       : action_type::POST_ANSWER,
                                    date->to_string());
         ++num_actions;
     }
@@ -256,32 +243,6 @@ void extract_post_history(const std::string& folder, ActionMap& actions)
 
     printing::progress progress{" > Extracting PostHistory: ",
                                 filesystem::file_size(filename)};
-
-    auto action_name = [](uint64_t history_type_id) {
-        switch (history_type_id)
-        {
-            case 1:
-            case 2:
-            case 3:
-                return "init";
-            case 4:
-            case 7:
-                return "edit title";
-            case 5:
-            case 8:
-                return "edit body";
-            case 6:
-            case 9:
-                return "edit tags";
-            case 10:
-            case 11:
-            case 12:
-            case 13:
-                return "mod vote";
-            default:
-                return "mod action";
-        }
-    };
 
     io::xzifstream input{filename};
     xml_text_reader reader{input, progress};
@@ -306,11 +267,11 @@ void extract_post_history(const std::string& folder, ActionMap& actions)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
-        auto type_num = std::stoul(type->to_string());
-        auto aname = action_name(type_num);
-        if (aname == "init")
+        history_type_id type_num{std::stoul(type->to_string())};
+        auto atype = action_cast(type_num);
+        if (atype == action_type::INIT)
             continue;
-        actions[user].emplace_back(aname, date->to_string());
+        actions[user].emplace_back(atype, date->to_string());
         ++num_actions;
     }
     progress.end();
@@ -358,16 +319,19 @@ void write_sequences(std::ostream& out, const std::vector<action>& actions,
         io::packed::write(out, av.size());
         for (const auto& act : av)
         {
-            io::packed::write(out, act.id);
+            io::packed::write(out, act.type);
         }
     }
 }
 
 int main(int argc, char** argv)
 {
-    if (argc != 2)
+    if (argc < 2)
     {
-        std::cerr << "Usage: " << argv[0] << " folder" << std::endl;
+        std::cerr << "Usage: " << argv[0] << " folder [output-file]"
+                  << std::endl;
+        std::cerr << "\toutput-file: defaults to \"sequences.bin\""
+                  << std::endl;
         return 1;
     }
 
@@ -391,7 +355,8 @@ int main(int argc, char** argv)
     extract_post_history(folder, actions);
 
     sequence_stats stats;
-    std::ofstream sequences{"sequences.bin", std::ios::binary};
+    std::ofstream sequences{argc > 2 ? argv[2] : "sequences.bin",
+                            std::ios::binary};
     io::packed::write(sequences, actions.size());
     for (auto& pr : actions)
     {
