@@ -23,6 +23,10 @@ target_compile_definitions(extract-sequences PRIVATE ${LIBXML2_DEFINITIONS})
 add_executable(cluster-sequences src/cluster_sequences.cpp)
 target_link_libraries(cluster-sequences meta-sequence meta-hmm)
 
+add_executable(dmmm-gibbs src/dm_mixture_model.cpp)
+target_link_libraries(dmmm-gibbs cpptoml meta-io meta-sequence)
+target_include_directories(dmmm-gibbs PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
 add_executable(print-hmm src/print_hmm.cpp)
 target_link_libraries(print-hmm meta-sequence meta-hmm)
 target_include_directories(print-hmm PRIVATE ${PROJECT_SOURCE_DIR}/include)

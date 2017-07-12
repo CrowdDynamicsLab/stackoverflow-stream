@@ -1,0 +1,5 @@
+[dm-mixture-model]
+topics = 5
+max-iter = 1000
+alpha = 0.1
+beta = 0.1
