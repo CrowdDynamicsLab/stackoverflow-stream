@@ -92,6 +92,19 @@ class dm_mixture_model
         }
     }
 
+    void save(const std::string& prefix) const
+    {
+        if (!filesystem::exists(prefix))
+            filesystem::make_directories(prefix);
+
+        std::ofstream topics_file{prefix + "/topics.bin", std::ios::binary};
+        io::packed::write(topics_file, topics_);
+
+        std::ofstream topic_proportions_file{prefix + "/topic-proportions.bin",
+                                             std::ios::binary};
+        io::packed::write(topic_proportions_file, topic_proportions_);
+    }
+
   private:
     template <class RandomNumberEngine>
     void initialize(const training_data_type& training,
@@ -340,6 +353,10 @@ int main(int argc, char** argv)
     dm_mixture_model model{training, options, rng};
     model.run(training, mix_config->get_as<uint64_t>("max-iter").value_or(1000),
               rng);
+
+    LOG(info) << "Saving estimate based on final chain sample..." << ENDLG;
+    model.save(
+        mix_config->get_as<std::string>("prefix").value_or("dmmm-model"));
 
     return 0;
 }
