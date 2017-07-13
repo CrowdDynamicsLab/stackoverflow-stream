@@ -27,6 +27,10 @@ add_executable(dmmm-gibbs src/dm_mixture_model.cpp)
 target_link_libraries(dmmm-gibbs cpptoml meta-io meta-sequence)
 target_include_directories(dmmm-gibbs PRIVATE ${PROJECT_SOURCE_DIR}/include)
 
+add_executable(dmmm-to-csv src/dmmm_to_csv.cpp)
+target_link_libraries(dmmm-to-csv meta-io)
+target_include_directories(dmmm-to-csv PRIVATE ${PROJECT_SOURCE_DIR}/include)
+
 add_executable(print-hmm src/print_hmm.cpp)
 target_link_libraries(print-hmm meta-sequence meta-hmm)
 target_include_directories(print-hmm PRIVATE ${PROJECT_SOURCE_DIR}/include)
