@@ -26,7 +26,7 @@ enum class action_type : uint8_t
     INIT
 };
 
-meta::util::string_view action_name(action_type type)
+inline meta::util::string_view action_name(action_type type)
 {
     static meta::util::string_view names[]
         = {"question", "answer", "comment", "edit", "mod vote", "mod action"};
@@ -38,7 +38,7 @@ meta::util::string_view action_name(action_type type)
     return names[static_cast<uint8_t>(type)];
 }
 
-action_type action_cast(history_type_id id)
+inline action_type action_cast(history_type_id id)
 {
     switch (id)
     {
@@ -68,7 +68,7 @@ action_type action_cast(history_type_id id)
     }
 }
 
-action_type action_cast(meta::sequence::state_id id)
+inline action_type action_cast(meta::sequence::state_id id)
 {
     return static_cast<action_type>(static_cast<uint64_t>(id));
 }
