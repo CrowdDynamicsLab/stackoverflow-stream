@@ -65,7 +65,7 @@ class dm_mixture_model
                                                   opts.alpha, opts.num_topics))
     {
         initialize(training, std::forward<RandomNumberEngine>(rng));
-    };
+    }
 
     template <class RandomNumberEngine>
     void run(const training_data_type& training, uint64_t num_iters,
