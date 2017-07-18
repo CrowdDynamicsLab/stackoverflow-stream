@@ -59,10 +59,12 @@ class dm_mixture_model
                               })),
           // initialize all topics with the same prior pseudo-counts
           topics_(opts.num_topics,
-                  stats::dirichlet<action_type>(
-                      opts.beta, static_cast<uint64_t>(action_type::INIT))),
-          topic_proportions_(training.size(), stats::dirichlet<topic_id>(
-                                                  opts.alpha, opts.num_topics))
+                  stats::multinomial<action_type>{stats::dirichlet<action_type>(
+                      opts.beta, static_cast<uint64_t>(action_type::INIT))}),
+          topic_proportions_(
+              training.size(),
+              stats::multinomial<topic_id>{
+                  stats::dirichlet<topic_id>(opts.alpha, opts.num_topics)})
     {
         initialize(training, std::forward<RandomNumberEngine>(rng));
     }
