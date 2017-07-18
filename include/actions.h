@@ -17,9 +17,12 @@ MAKE_NUMERIC_IDENTIFIER(history_type_id, uint64_t)
 
 enum class action_type : uint8_t
 {
-    POST_QUESTION = 0,
-    POST_ANSWER,
-    POST_COMMENT,
+    QUESTION = 0,
+    ANSWER,
+    COMMENT_OWN_QUESTION,
+    COMMENT_ANSWER_OWN_QUESTION,
+    COMMENT_OTHER_QUESTION,
+    COMMENT_ANSWER_OTHER_QUESTION,
     EDIT,
     MOD_VOTE,
     MOD_ACTION,
@@ -28,14 +31,30 @@ enum class action_type : uint8_t
 
 inline meta::util::string_view action_name(action_type type)
 {
-    static meta::util::string_view names[]
-        = {"question", "answer", "comment", "edit", "mod vote", "mod action"};
-
-    if (static_cast<uint64_t>(type) > sizeof(names))
-        throw std::out_of_range{"invalid action_type "
-                                + std::to_string(static_cast<uint64_t>(type))};
-
-    return names[static_cast<uint8_t>(type)];
+    switch (type)
+    {
+        case action_type::QUESTION:
+            return "question";
+        case action_type::ANSWER:
+            return "answer";
+        case action_type::COMMENT_OWN_QUESTION:
+            return "comment (own question)";
+        case action_type::COMMENT_ANSWER_OWN_QUESTION:
+            return "comment (answer to own question)";
+        case action_type::COMMENT_OTHER_QUESTION:
+            return "comment (other question)";
+        case action_type::COMMENT_ANSWER_OTHER_QUESTION:
+            return "comment (answer to other question)";
+        case action_type::EDIT:
+            return "edit";
+        case action_type::MOD_VOTE:
+            return "mod vote";
+        case action_type::MOD_ACTION:
+            return "mod action";
+        case action_type::INIT:
+            throw std::out_of_range{"INIT cannot be converted to string"};
+    }
+    return "unreachable";
 }
 
 inline action_type action_cast(history_type_id id)

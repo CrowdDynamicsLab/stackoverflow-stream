@@ -23,6 +23,7 @@
 #include "actions.h"
 
 MAKE_NUMERIC_IDENTIFIER(user_id, uint64_t)
+MAKE_NUMERIC_IDENTIFIER(post_id, uint64_t)
 
 using namespace meta;
 
@@ -129,7 +130,6 @@ class xml_text_reader
     xmlTextReaderPtr reader_;
 };
 
-
 std::time_t parse_date(const std::string& date)
 {
     std::tm t = {};
@@ -157,8 +157,9 @@ bool operator<(const action& a, const action& b)
     return a.date < b.date;
 }
 
-template <class ActionMap>
-void extract_comments(const std::string& folder, ActionMap& actions)
+template <class ActionMap, class PostMap>
+void extract_comments(const std::string& folder, ActionMap& actions,
+                      PostMap& post_map)
 {
     auto filename = folder + "/Comments.xml.xz";
 
@@ -180,14 +181,47 @@ void extract_comments(const std::string& folder, ActionMap& actions)
             throw std::runtime_error{"unrecognized XML entity "
                                      + node_name.to_string()};
 
+        auto pid = reader.attribute("PostId");
         auto uid = reader.attribute("UserId");
         auto dte = reader.attribute("CreationDate");
 
-        if (!uid || !dte)
+        if (!pid || !uid || !dte)
             continue;
 
+        post_id post{std::stoul(pid->to_string())};
         user_id user{std::stoul(uid->to_string())};
-        actions[user].emplace_back(action_type::POST_COMMENT, dte->to_string());
+
+        // skip comments where we can't find the parent
+        // this could happen if the parent post had no user id specified
+        // and we dropped it during post extraction
+        auto it = post_map.find(post);
+        if (it == post_map.end())
+            continue;
+
+        // determine comment type
+        action_type type;
+        if (it->value().parent)
+        {
+            // comment was on an answer. Was the question our own?
+            auto qit = post_map.find(*it->value().parent);
+
+            // ignore comments on answers to questions that aren't
+            // associated with any user id
+            if (qit == post_map.end())
+                continue;
+
+            type = qit->value().op == user
+                       ? action_type::COMMENT_ANSWER_OWN_QUESTION
+                       : action_type::COMMENT_OTHER_QUESTION;
+        }
+        else
+        {
+            // comment was on a question. Was the question our own?
+            type = it->value().op == user ? action_type::COMMENT_OWN_QUESTION
+                                          : action_type::COMMENT_OTHER_QUESTION;
+        }
+
+        actions[user].emplace_back(type, dte->to_string());
 
         ++num_actions;
     }
@@ -195,9 +229,28 @@ void extract_comments(const std::string& folder, ActionMap& actions)
     LOG(progress) << "\rFound " << num_actions << " comments\n" << ENDLG;
 }
 
-template <class ActionMap>
-void extract_posts(const std::string& folder, ActionMap& actions)
+struct post_info
 {
+    post_info(user_id uid) : op{uid}
+    {
+        // nothing
+    }
+
+    post_info(user_id uid, post_id pid) : op{uid}, parent{pid}
+    {
+        // nothing
+    }
+
+    user_id op;
+    util::optional<post_id> parent;
+};
+
+template <class ActionMap>
+hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
+                                                     ActionMap& actions)
+{
+    hashing::probe_map<post_id, post_info> post_map;
+
     auto filename = folder + "/Posts.xml.xz";
 
     printing::progress progress{" > Extracting Posts: ",
@@ -221,19 +274,34 @@ void extract_posts(const std::string& folder, ActionMap& actions)
         auto post_type = reader.attribute("PostTypeId");
         auto date = reader.attribute("CreationDate");
         auto uid = reader.attribute("OwnerUserId");
+        auto id = reader.attribute("Id");
 
         if (!post_type || !date || !uid)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
+        post_id post{std::stoul(id->to_string())};
+
+        auto parent_id = reader.attribute("ParentId");
+        if (parent_id)
+        {
+            post_id parent{std::stoul(parent_id->to_string())};
+            post_map.emplace(post, post_info{user, parent});
+        }
+        else
+        {
+            post_map.emplace(post, user);
+        }
+
         actions[user].emplace_back((post_type->sv() == "1")
-                                       ? action_type::POST_QUESTION
-                                       : action_type::POST_ANSWER,
+                                       ? action_type::QUESTION
+                                       : action_type::ANSWER,
                                    date->to_string());
         ++num_actions;
     }
     progress.end();
     LOG(progress) << "\rFound " << num_actions << " posts\n" << ENDLG;
+    return post_map;
 }
 
 template <class ActionMap>
@@ -350,8 +418,10 @@ int main(int argc, char** argv)
     }
 
     hashing::probe_map<user_id, std::vector<action>> actions;
-    extract_comments(folder, actions);
-    extract_posts(folder, actions);
+    {
+        auto post_map = extract_posts(folder, actions);
+        extract_comments(folder, actions, post_map);
+    }
     extract_post_history(folder, actions);
 
     sequence_stats stats;
