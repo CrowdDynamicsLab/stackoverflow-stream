@@ -351,7 +351,7 @@ int main(int argc, char** argv)
     LOG(info) << "Read " << total_sessions << " sessions from "
               << training.size() << " networks" << ENDLG;
 
-    std::mt19937 rng;
+    random::xoroshiro128 rng{std::random_device{}()};
     dm_mixture_model model{training, options, rng};
     model.run(training, mix_config->get_as<uint64_t>("max-iter").value_or(1000),
               rng);
