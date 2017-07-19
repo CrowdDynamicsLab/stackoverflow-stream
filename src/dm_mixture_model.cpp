@@ -182,7 +182,7 @@ class dm_mixture_model
         //
         topic_id result{0};
         auto max_value = std::numeric_limits<float>::lowest();
-        std::uniform_int_distribution<> dist{0, 1};
+        std::uniform_real_distribution<float> dist{0, 1};
 
         const auto num_topics = topics_.size();
         for (topic_id z{0}; z < num_topics; ++z)
