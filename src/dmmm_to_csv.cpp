@@ -47,9 +47,11 @@ int main(int argc, char** argv)
             topics_file);
 
     // write topics to CSV
+    filesystem::make_directory("topics");
     for (std::size_t i = 0; i < topics.size(); ++i)
     {
-        std::ofstream topics_csv{"topic" + std::to_string(i + 1) + ".csv"};
+        std::ofstream topics_csv{"topics/topic" + std::to_string(i + 1)
+                                 + ".csv"};
         topics_csv << "action,probability\n";
         topics[i].each_seen_event([&](action_type a) {
             topics_csv << action_name(a) << "," << topics[i].probability(a)
@@ -63,12 +65,13 @@ int main(int argc, char** argv)
         theta_file);
 
     // write topic proportions to CSV
+    filesystem::make_directory("proportions");
     for (std::size_t i = 0; i < theta.size(); ++i)
     {
-        auto filename = args[2 + i].substr(
-                args[2 + i].find_last_of("/") + 1);
+        auto filename = args[2 + i].substr(args[2 + i].find_last_of("/") + 1);
         filename = filename.substr(0, filename.find_last_of("-"));
-        std::ofstream topic_prop_csv{filename + "-proportions.csv"};
+        std::ofstream topic_prop_csv{"proportions/" + filename
+                                     + "-proportions.csv"};
         topic_prop_csv << "topic,probability\n";
         theta[i].each_seen_event([&](topic_id k) {
             topic_prop_csv << k + 1 << "," << theta[i].probability(k) << "\n";
