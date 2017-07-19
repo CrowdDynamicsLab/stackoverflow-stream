@@ -1,5 +1,5 @@
 [dm-mixture-model]
 topics = 5
-max-iter = 1000
+max-iter = 200 # the sampler converges relatively quickly
 alpha = 10
 beta = 0.1
