@@ -86,6 +86,7 @@ class dm_mixture_model
 
             perform_iteration(progress, training,
                               std::forward<RandomNumberEngine>(rng));
+            progress.end();
             progress.clear();
             LOG(progress) << "> Iteration " << iter
                           << " log joint likelihood: " << log_joint_likelihood()
