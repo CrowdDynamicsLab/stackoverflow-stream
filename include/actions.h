@@ -38,13 +38,13 @@ inline meta::util::string_view action_name(action_type type)
         case action_type::ANSWER:
             return "answer";
         case action_type::COMMENT_OWN_QUESTION:
-            return "comment (own question)";
+            return "comment (mq)";
         case action_type::COMMENT_ANSWER_OWN_QUESTION:
-            return "comment (answer to own question)";
+            return "comment (a2mq)";
         case action_type::COMMENT_OTHER_QUESTION:
-            return "comment (other question)";
+            return "comment (oq)";
         case action_type::COMMENT_ANSWER_OTHER_QUESTION:
-            return "comment (answer to other question)";
+            return "comment (a2oq)";
         case action_type::EDIT:
             return "edit";
         case action_type::MOD_VOTE:
