@@ -212,7 +212,7 @@ void extract_comments(const std::string& folder, ActionMap& actions,
 
             type = qit->value().op == user
                        ? action_type::COMMENT_ANSWER_OWN_QUESTION
-                       : action_type::COMMENT_OTHER_QUESTION;
+                       : action_type::COMMENT_ANSWER_OTHER_QUESTION;
         }
         else
         {
