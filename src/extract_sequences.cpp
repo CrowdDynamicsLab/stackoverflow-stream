@@ -24,9 +24,6 @@
 
 #include "actions.h"
 
-MAKE_NUMERIC_IDENTIFIER(user_id, uint64_t)
-MAKE_NUMERIC_IDENTIFIER(post_id, uint64_t)
-
 using namespace meta;
 
 class xml_string
@@ -195,37 +192,16 @@ void extract_comments(const std::string& folder, ActionMap& actions,
         post_id post{std::stoul(pid->to_string())};
         user_id user{std::stoul(uid->to_string())};
 
-        // skip comments where we can't find the parent
-        // this could happen if the parent post had no user id specified
-        // and we dropped it during post extraction
-        auto it = post_map.find(post);
-        if (it == post_map.end())
+        // skip comments where we either (a) can't find the parent or (b)
+        // can't find the root question
+        //
+        // this could happen if the parent post(s) have no user id
+        // specified and we thus dropped it during post extraction
+        auto type = comment_type(post, user, post_map);
+        if (!type)
             continue;
 
-        // determine comment type
-        action_type type;
-        if (it->value().parent)
-        {
-            // comment was on an answer. Was the question our own?
-            auto qit = post_map.find(*it->value().parent);
-
-            // ignore comments on answers to questions that aren't
-            // associated with any user id
-            if (qit == post_map.end())
-                continue;
-
-            type = qit->value().op == user
-                       ? action_type::COMMENT_ANSWER_OWN_QUESTION
-                       : action_type::COMMENT_ANSWER_OTHER_QUESTION;
-        }
-        else
-        {
-            // comment was on a question. Was the question our own?
-            type = it->value().op == user ? action_type::COMMENT_OWN_QUESTION
-                                          : action_type::COMMENT_OTHER_QUESTION;
-        }
-
-        actions[user].emplace_back(type, dte->to_string());
+        actions[user].emplace_back(*type, dte->to_string());
 
         ++num_actions;
     }
@@ -286,21 +262,31 @@ hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
         user_id user{std::stoul(uid->to_string())};
         post_id post{std::stoul(id->to_string())};
 
+        action_type type;
         auto parent_id = reader.attribute("ParentId");
         if (parent_id)
         {
             post_id parent{std::stoul(parent_id->to_string())};
             post_map.emplace(post, post_info{user, parent});
+
+            // this is an answer. Was the question our own?
+            auto ptype = content(parent, user, post_map);
+
+            // skip answers to questions we weren't able to attach to a
+            // user id
+            if (!ptype)
+                continue;
+
+            type = ptype == content_type::MY_QUESTION ? action_type::ANSWER_MQ
+                                                      : action_type::ANSWER_OQ;
         }
         else
         {
             post_map.emplace(post, user);
+            type = action_type::QUESTION;
         }
 
-        actions[user].emplace_back((post_type->sv() == "1")
-                                       ? action_type::QUESTION
-                                       : action_type::ANSWER,
-                                   date->to_string());
+        actions[user].emplace_back(type, date->to_string());
         ++num_actions;
     }
     progress.end();
@@ -308,8 +294,9 @@ hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
     return post_map;
 }
 
-template <class ActionMap>
-void extract_post_history(const std::string& folder, ActionMap& actions)
+template <class ActionMap, class PostMap>
+void extract_post_history(const std::string& folder, ActionMap& actions,
+                          PostMap& post_map)
 {
     auto filename = folder + "/PostHistory.xml.xz";
 
@@ -334,15 +321,28 @@ void extract_post_history(const std::string& folder, ActionMap& actions)
         auto uid = reader.attribute("UserId");
         auto type = reader.attribute("PostHistoryTypeId");
         auto date = reader.attribute("CreationDate");
+        auto pid = reader.attribute("PostId");
 
         if (!uid || !type || !date)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
         history_type_id type_num{std::stoul(type->to_string())};
-        auto atype = action_cast(type_num);
+        post_id post{std::stoul(pid->to_string())};
+
+        // skip history items where we can't identify the post
+        auto it = post_map.find(post);
+        if (it == post_map.end())
+            continue;
+
+        auto ctype = content(post, user, post_map);
+        if (!ctype)
+            continue;
+
+        auto atype = action_cast(type_num, *ctype);
         if (atype == action_type::INIT)
             continue;
+
         actions[user].emplace_back(atype, date->to_string());
         ++num_actions;
     }
@@ -428,8 +428,8 @@ int main(int argc, char** argv)
     {
         auto post_map = extract_posts(folder, user_map);
         extract_comments(folder, user_map, post_map);
+        extract_post_history(folder, user_map, post_map);
     }
-    extract_post_history(folder, user_map);
 
     auto actions = std::move(user_map).extract();
     using value_type = decltype(actions)::value_type;
