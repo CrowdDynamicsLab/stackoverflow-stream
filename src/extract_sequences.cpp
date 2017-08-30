@@ -10,6 +10,8 @@
 #include <iostream>
 #include <libxml/xmlreader.h>
 
+#include "date.h"
+
 #include "meta/hashing/probe_map.h"
 #include "meta/io/filesystem.h"
 #include "meta/io/packed.h"
@@ -130,14 +132,16 @@ class xml_text_reader
     xmlTextReaderPtr reader_;
 };
 
-std::time_t parse_date(const std::string& date)
+using sys_milliseconds = date::sys_time<std::chrono::milliseconds>;
+
+sys_milliseconds parse_date(const std::string& date)
 {
-    std::tm t = {};
     std::stringstream ss{date};
-
-    ss >> std::get_time(&t, "%Y-%m-%dT%H:%M:%S");
-
-    return ::timegm(&t);
+    sys_milliseconds tp;
+    ss >> date::parse("%Y-%m-%dT%H:%M:%S", tp);
+    if (ss.fail())
+        throw std::runtime_error{"failed to parse date: " + date};
+    return tp;
 }
 
 struct action
@@ -149,7 +153,7 @@ struct action
     }
 
     action_type type;
-    std::time_t date;
+    sys_milliseconds date;
 };
 
 bool operator<(const action& a, const action& b)
@@ -356,17 +360,20 @@ struct sequence_stats
 void write_sequences(std::ostream& out, const std::vector<action>& actions,
                      sequence_stats& stats)
 {
-    auto six_hours = 60 * 60 * 6;
+    using namespace std::chrono;
     const action* begin = &actions[0];
     const action* last = begin;
 
     std::vector<util::array_view<const action>> sequences;
     for (const auto& act : actions)
     {
+        auto gap = act.date - last->date;
         if (&act != last)
-            stats.gap_length.add(act.date - last->date);
+        {
+            stats.gap_length.add(duration_cast<seconds>(gap).count());
+        }
 
-        if (act.date - last->date > six_hours)
+        if (act.date - last->date > hours{6})
         {
             last = &act;
             sequences.emplace_back(begin, last);
@@ -417,12 +424,19 @@ int main(int argc, char** argv)
         }
     }
 
-    hashing::probe_map<user_id, std::vector<action>> actions;
+    hashing::probe_map<user_id, std::vector<action>> user_map;
     {
-        auto post_map = extract_posts(folder, actions);
-        extract_comments(folder, actions, post_map);
+        auto post_map = extract_posts(folder, user_map);
+        extract_comments(folder, user_map, post_map);
     }
-    extract_post_history(folder, actions);
+    extract_post_history(folder, user_map);
+
+    auto actions = std::move(user_map).extract();
+    using value_type = decltype(actions)::value_type;
+    std::sort(actions.begin(), actions.end(),
+              [](const value_type& a, const value_type& b) {
+                  return a.first < b.first;
+              });
 
     sequence_stats stats;
     std::ofstream sequences{argc > 2 ? argv[2] : "sequences.bin",
@@ -430,9 +444,9 @@ int main(int argc, char** argv)
     io::packed::write(sequences, actions.size());
     for (auto& pr : actions)
     {
-        std::sort(pr.value().begin(), pr.value().end());
+        std::sort(pr.second.begin(), pr.second.end());
 
-        write_sequences(sequences, pr.value(), stats);
+        write_sequences(sequences, pr.second, stats);
     }
 
     LOG(info) << "Sequence length: " << stats.sequence_length.mean() << " +/- "
