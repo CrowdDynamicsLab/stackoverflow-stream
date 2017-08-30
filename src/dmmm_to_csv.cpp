@@ -16,7 +16,6 @@
 using namespace meta;
 
 MAKE_NUMERIC_IDENTIFIER(network_id, uint64_t)
-MAKE_NUMERIC_IDENTIFIER(topic_id, uint64_t)
 
 int main(int argc, char** argv)
 {
