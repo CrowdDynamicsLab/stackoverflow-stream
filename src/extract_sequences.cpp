@@ -357,8 +357,14 @@ struct sequence_stats
     stats::running_stats gap_length;
 };
 
-void write_sequences(std::ostream& out, const std::vector<action>& actions,
-                     sequence_stats& stats)
+using session_actions = util::array_view<const action>;
+using session_list = std::vector<session_actions>;
+using slice = std::vector<session_list>;
+
+void partition_sequences(std::vector<slice>& slices,
+                         const std::vector<action>& actions,
+                         sequence_stats& stats, sys_milliseconds birth,
+                         date::months step_size)
 {
     using namespace std::chrono;
     const action* begin = &actions[0];
@@ -387,24 +393,64 @@ void write_sequences(std::ostream& out, const std::vector<action>& actions,
     sequences.emplace_back(begin, last + 1);
 
     stats.num_sequences.add(sequences.size());
-    io::packed::write(out, sequences.size());
-    for (const auto& av : sequences)
+
+    // partition sequences based on step size
+    std::size_t slice_num = 0;
+    auto it = sequences.begin();
+    auto end = sequences.end();
+
+    while (it != end)
     {
-        stats.sequence_length.add(av.size());
-        io::packed::write(out, av.size());
-        for (const auto& act : av)
+        auto slice_end = std::find_if(
+            it, end, [=](const util::array_view<const action>& sequence) {
+                return (sequence.begin()->date - birth) / step_size
+                       > static_cast<long>(slice_num);
+            });
+
+        auto& curr_slice = slices.at(slice_num);
+        curr_slice.emplace_back();
+
+        for (; it != slice_end; ++it)
         {
-            io::packed::write(out, act.type);
+            stats.sequence_length.add(it->size());
+            curr_slice.back().emplace_back(*it);
+        }
+        it = slice_end;
+        ++slice_num;
+    }
+}
+
+void write_slice(std::ostream& out, const slice& slice)
+{
+    io::packed::write(out, slice.size());
+    for (const auto& sessions : slice)
+    {
+        io::packed::write(out, sessions.size());
+        for (const auto& session : sessions)
+        {
+            io::packed::write(out, session.size());
+            for (const auto& act : session)
+            {
+                io::packed::write(out, act.type);
+            }
         }
     }
 }
 
 int main(int argc, char** argv)
 {
+    using namespace std::chrono;
+
     if (argc < 2)
     {
-        std::cerr << "Usage: " << argv[0] << " folder [output-file]"
+        std::cerr << "Usage: " << argv[0]
+                  << " [--time-slice=N] folder [output-file]" << std::endl;
+
+        std::cerr << "\t--time-slice=N\n"
+                  << "\t\tCreate a separate sequence file for every N months "
+                     "after network birth"
                   << std::endl;
+
         std::cerr << "\toutput-file: defaults to \"sequences.bin\""
                   << std::endl;
         return 1;
@@ -412,7 +458,35 @@ int main(int argc, char** argv)
 
     logging::set_cerr_logging();
 
-    std::string folder{argv[1]};
+    std::vector<std::string> args{argv, argv + argc};
+
+    auto folder_name_iter = std::find_if(
+        args.begin() + 1, args.end(),
+        [](const std::string& arg) { return !arg.empty() && arg[0] != '-'; });
+    if (folder_name_iter == args.end())
+    {
+        LOG(fatal) << "Could not determine folder argument" << ENDLG;
+        return 1;
+    }
+
+    auto time_slice_iter
+        = std::find_if(args.begin() + 1, args.end(), [](util::string_view arg) {
+              return arg.size() > 13 && arg.substr(0, 13) == "--time-slice=";
+          });
+
+    date::months time_slice{std::numeric_limits<date::months::rep>::max()};
+    if (time_slice_iter == args.end())
+    {
+        LOG(info) << "Creating one output file" << ENDLG;
+    }
+    else
+    {
+        time_slice = date::months{std::stoi(time_slice_iter->substr(13))};
+        LOG(info) << "Creating a separate output file for every "
+                  << time_slice.count() << " months since birth" << ENDLG;
+    }
+
+    const auto& folder = *folder_name_iter;
     for (const auto& name :
          {"Comments.xml.xz", "Posts.xml.xz", "PostHistory.xml.xz"})
     {
@@ -438,15 +512,39 @@ int main(int argc, char** argv)
                   return a.first < b.first;
               });
 
-    sequence_stats stats;
-    std::ofstream sequences{argc > 2 ? argv[2] : "sequences.bin",
-                            std::ios::binary};
-    io::packed::write(sequences, actions.size());
+    LOG(info) << "Sorting sequences..." << ENDLG;
+    sys_milliseconds first_action{
+        milliseconds{std::numeric_limits<milliseconds::rep>::max()}};
+    sys_milliseconds last_action{
+        milliseconds{std::numeric_limits<milliseconds::rep>::lowest()}};
     for (auto& pr : actions)
     {
         std::sort(pr.second.begin(), pr.second.end());
 
-        write_sequences(sequences, pr.second, stats);
+        first_action = std::min(pr.second.front().date, first_action);
+        last_action = std::max(pr.second.front().date, last_action);
+    }
+    LOG(info) << "Time span: ["
+              << date::format("%Y-%m-%dT%H:%M:%S", first_action) << ", "
+              << date::format("%Y-%m-%dT%H:%M:%S", last_action) << "]" << ENDLG;
+
+    auto diff = last_action - first_action;
+    auto num_files = static_cast<std::size_t>(diff / time_slice + 1);
+
+    std::vector<slice> slices(num_files);
+    sequence_stats stats;
+    for (const auto& pr : actions)
+    {
+        partition_sequences(slices, pr.second, stats, first_action, time_slice);
+    }
+
+    for (std::size_t i = 0; i < num_files; ++i)
+    {
+        std::string filename = argc > 2 ? args.back() : "sequences";
+        filename += "." + std::to_string(i) + ".bin";
+        std::ofstream output{filename, std::ios::binary};
+
+        write_slice(output, slices.at(i));
     }
 
     LOG(info) << "Sequence length: " << stats.sequence_length.mean() << " +/- "
