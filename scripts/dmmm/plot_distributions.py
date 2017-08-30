@@ -14,7 +14,7 @@ for filename in os.listdir(sys.argv[1]):
     x = 'topic' if filename.endswith('proportions.csv') else 'action'
     plot = sns.barplot(x=x, y="probability", data=dset)
     if x == 'action':
-        plt.xticks(rotation=30)
+        plt.xticks(rotation=90)
     plt.tight_layout()
     plt.savefig(filename.replace('.csv', '.png'))
     plt.close()
