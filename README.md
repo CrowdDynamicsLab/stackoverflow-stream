@@ -16,6 +16,10 @@ extracted from StackExchange data dumps.
 ## Building
 
 ```bash
+# Update dependencies
+git submodule update --init --recursive
+
+# Build
 mkdir build
 cd build
 cmake .. -DCMAKE_BUILD_TYPE=Release
