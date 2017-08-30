@@ -20,4 +20,4 @@ for root, dirs, files in os.walk(sys.argv[1]):
             continue
 
         print("Extracting sequences from {} into sequences/{}-sequences.bin...".format(dirname, community_name))
-        os.system("./extract-sequences {} {}".format(os.path.join(root, dirname), file_name))
+        os.system("./extract-sequences --time-slice=1 {} {}".format(os.path.join(root, dirname), file_name))
