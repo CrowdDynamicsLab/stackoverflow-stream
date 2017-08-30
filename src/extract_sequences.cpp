@@ -540,9 +540,13 @@ int main(int argc, char** argv)
 
     for (std::size_t i = 0; i < num_files; ++i)
     {
-        std::string filename = argc > 2 ? args.back() : "sequences";
-        filename += "." + std::to_string(i) + ".bin";
-        std::ofstream output{filename, std::ios::binary};
+        std::stringstream filename;
+        if (argc < 2)
+            filename << "sequences";
+        else
+            filename << args.back();
+        filename << "." << std::setw(3) << std::setfill('0') << i << ".bin";
+        std::ofstream output{filename.str(), std::ios::binary};
 
         write_slice(output, slices.at(i));
     }
