@@ -68,7 +68,12 @@ int main(int argc, char** argv)
     for (std::size_t i = 0; i < theta.size(); ++i)
     {
         auto filename = args[2 + i].substr(args[2 + i].find_last_of("/") + 1);
-        filename = filename.substr(0, filename.find_last_of("-"));
+        auto dash_pos = filename.find_last_of("-");
+        auto num_end = filename.rfind(".");
+        auto num_start = filename.find_first_of("0123456789", dash_pos);
+
+        filename = filename.substr(0, dash_pos + 1)
+                   + filename.substr(num_start, num_end - num_start);
         std::ofstream topic_prop_csv{"proportions/" + filename
                                      + "-proportions.csv"};
         topic_prop_csv << "topic,probability\n";
