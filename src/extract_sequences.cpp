@@ -8,9 +8,9 @@
 
 #include <fstream>
 #include <iostream>
-#include <libxml/xmlreader.h>
 
 #include "date.h"
+#include "parsing.h"
 
 #include "meta/hashing/probe_map.h"
 #include "meta/io/filesystem.h"
@@ -25,121 +25,6 @@
 #include "actions.h"
 
 using namespace meta;
-
-class xml_string
-{
-  public:
-    xml_string(xmlChar* str) : str_{str}
-    {
-        // nothing
-    }
-
-    ~xml_string()
-    {
-        ::free(str_);
-    }
-
-    xml_string(xml_string&& other) : str_(other.str_)
-    {
-        other.str_ = nullptr;
-    }
-
-    xml_string& operator=(xml_string&& other)
-    {
-        str_ = other.str_;
-        other.str_ = nullptr;
-        return *this;
-    }
-
-    xml_string(const xml_string&) = delete;
-    xml_string& operator=(const xml_string&) = delete;
-
-    std::string to_string() const
-    {
-        return {(const char*)str_};
-    }
-
-    util::string_view sv() const
-    {
-        return {(const char*)str_};
-    }
-
-  private:
-    xmlChar* str_;
-};
-
-class xml_text_reader
-{
-  public:
-    xml_text_reader(io::xzifstream& input, printing::progress& progress)
-        : input_(input), progress_(progress), reader_{make_xml_reader()}
-    {
-    }
-
-    bool read_next()
-    {
-        return xmlTextReaderRead(reader_);
-    }
-
-    util::string_view node_name() const
-    {
-        return (const char*)xmlTextReaderConstName(reader_);
-    }
-
-    util::optional<xml_string> attribute(const char* name) const
-    {
-        auto str = xmlTextReaderGetAttribute(reader_, (const xmlChar*)name);
-        if (!str)
-            return util::nullopt;
-        return {str};
-    }
-
-    operator xmlTextReaderPtr()
-    {
-        return reader_;
-    }
-
-  private:
-    xmlTextReaderPtr make_xml_reader()
-    {
-        return xmlReaderForIO(
-            // Read callback
-            [](void* context, char* buffer, int len) {
-                auto self = static_cast<xml_text_reader*>(context);
-                self->input_.read(buffer, len);
-
-                auto num_read = static_cast<int>(self->input_.gcount());
-                self->progress_(self->input_.bytes_read());
-                return num_read;
-            },
-            // Close callback
-            [](void* /* context */) { return 0; },
-            // Context
-            this,
-            // URL
-            "",
-            // Encoding
-            nullptr,
-            // Options
-            XML_PARSE_NONET | XML_PARSE_NOBLANKS | XML_PARSE_RECOVER);
-    }
-
-    io::xzifstream& input_;
-    printing::progress& progress_;
-    xmlTextReaderPtr reader_;
-};
-
-using sys_milliseconds = date::sys_time<std::chrono::milliseconds>;
-
-sys_milliseconds parse_date(const std::string& date)
-{
-    std::stringstream ss{date};
-    sys_milliseconds tp;
-    ss >> date::parse("%Y-%m-%dT%H:%M:%S", tp);
-    if (ss.fail())
-        throw std::runtime_error{"failed to parse date: " + date};
-    return tp;
-}
 
 struct action
 {
