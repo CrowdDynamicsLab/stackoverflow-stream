@@ -407,7 +407,7 @@ int main(int argc, char** argv)
         std::sort(pr.second.begin(), pr.second.end());
 
         first_action = std::min(pr.second.front().date, first_action);
-        last_action = std::max(pr.second.front().date, last_action);
+        last_action = std::max(pr.second.back().date, last_action);
     }
     LOG(info) << "Time span: ["
               << date::format("%Y-%m-%dT%H:%M:%S", first_action) << ", "
