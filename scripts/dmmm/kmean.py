@@ -29,19 +29,22 @@ for filename in filenames:
 
 ### TEST FIELD FOR BEST NUMBER OF CLUSTERS BY CALCULATING SILHOUETTE COEFFICIENT ###
 """
-for clus_num in range(2, 161):
-	kmeans = KMeans(n_clusters=clus_num, random_state=0).fit(X)
-
+best_clus = 2
+best_silhouette = -1
+for clus_num in range(2, 10):
 	clusterer = KMeans(n_clusters=clus_num, random_state=0)
 	cluster_labels = clusterer.fit_predict(X)
 	silhouette_avg = silhouette_score(X, cluster_labels)
 
 	print("For n_clusters = "+str(clus_num)+", The average silhouette_score is : "+str(silhouette_avg))
+
+	if silhouette_avg > best_silhouette:
+		best_clus = clus_num
+		best_silhouette = silhouette_avg
+
+clus_num = best_clus
 """
-
-clus_num = 3
-
-kmeans = KMeans(n_clusters=clus_num, random_state=0).fit(X)
+clus_num = 2
 
 clusterer = KMeans(n_clusters=clus_num, random_state=0)
 cluster_labels = clusterer.fit_predict(X)
@@ -49,14 +52,14 @@ silhouette_avg = silhouette_score(X, cluster_labels)
 
 print("For n_clusters = "+str(clus_num)+", The average silhouette_score is : "+str(silhouette_avg))
 print("There are "+str(clus_num)+" clusters in total. They are the followings:")
-for i in range(len(kmeans.cluster_centers_)):
+for i in range(len(clusterer.cluster_centers_)):
 	print()
 	print("____________________NEW LINE____________________")
 	print("Stack Exchange led by cluster centroid")
-	print(kmeans.cluster_centers_[i])
+	print(clusterer.cluster_centers_[i])
 	print()
-	for j in range(len(kmeans.labels_)):
-		if kmeans.labels_[j] == i:
+	for j in range(len(clusterer.labels_)):
+		if clusterer.labels_[j] == i:
 			print(filenames[j])
 	print("____________________NEW LINE____________________")
 	print()
@@ -64,9 +67,10 @@ for i in range(len(kmeans.cluster_centers_)):
 	# Draw Graphs
 	objects = ('Topic 1', 'Topic 2', 'Topic 3', 'Topic 4', 'Topic 5')
 	y_pos = np.arange(len(objects))
-	performance = kmeans.cluster_centers_[i]
+	performance = clusterer.cluster_centers_[i]
 
 	plt.figure(figsize=(7, 7))
+	plt.ylim(0, 0.6)
 	plt.bar(y_pos, performance, align='center', alpha=0.5)
 	plt.xticks(y_pos, objects)
 	plt.title('Proportions Distribution')
@@ -78,8 +82,8 @@ for i in range(len(kmeans.cluster_centers_)):
 
 print("Summary:")
 print("Centroids:")
-print(kmeans.cluster_centers_)
+print(clusterer.cluster_centers_)
 print("Labels for Each Stack Exchange:")
-print(kmeans.labels_)
+print(clusterer.labels_)
 
 

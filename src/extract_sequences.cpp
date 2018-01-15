@@ -44,8 +44,8 @@ bool operator<(const action& a, const action& b)
 }
 
 template <class ActionMap, class PostMap>
-void extract_comments(const std::string& folder, ActionMap& actions,
-                      PostMap& post_map)
+time_span extract_comments(const std::string& folder, ActionMap& actions,
+                           PostMap& post_map)
 {
     auto filename = folder + "/Comments.xml.xz";
 
@@ -55,6 +55,7 @@ void extract_comments(const std::string& folder, ActionMap& actions,
     io::xzifstream input{filename};
     xml_text_reader reader{input, progress};
 
+    util::optional<time_span> span;
     uint64_t num_actions = 0;
     while (reader.read_next())
     {
@@ -71,7 +72,16 @@ void extract_comments(const std::string& folder, ActionMap& actions,
         auto uid = reader.attribute("UserId");
         auto dte = reader.attribute("CreationDate");
 
-        if (!pid || !uid || !dte)
+        if (!pid || !dte)
+            continue;
+
+        auto timestamp = parse_date(dte->to_string());
+        if (!span)
+            span = time_span{timestamp, timestamp};
+        else
+            span->update(timestamp);
+
+        if (!uid)
             continue;
 
         post_id post{std::stoul(pid->to_string())};
@@ -92,6 +102,7 @@ void extract_comments(const std::string& folder, ActionMap& actions,
     }
     progress.end();
     LOG(progress) << "\rFound " << num_actions << " comments\n" << ENDLG;
+    return *span;
 }
 
 struct post_info
@@ -111,8 +122,8 @@ struct post_info
 };
 
 template <class ActionMap>
-hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
-                                                     ActionMap& actions)
+std::tuple<hashing::probe_map<post_id, post_info>, time_span>
+extract_posts(const std::string& folder, ActionMap& actions)
 {
     hashing::probe_map<post_id, post_info> post_map;
 
@@ -124,6 +135,7 @@ hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
     io::xzifstream input{filename};
     xml_text_reader reader{input, progress};
 
+    util::optional<time_span> span;
     uint64_t num_actions = 0;
     while (reader.read_next())
     {
@@ -141,7 +153,16 @@ hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
         auto uid = reader.attribute("OwnerUserId");
         auto id = reader.attribute("Id");
 
-        if (!post_type || !date || !uid)
+        if (!post_type || !date)
+            continue;
+
+        auto timestamp = parse_date(date->to_string());
+        if (!span)
+            span = time_span{timestamp, timestamp};
+        else
+            span->update(timestamp);
+
+        if (!uid)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
@@ -176,11 +197,11 @@ hashing::probe_map<post_id, post_info> extract_posts(const std::string& folder,
     }
     progress.end();
     LOG(progress) << "\rFound " << num_actions << " posts\n" << ENDLG;
-    return post_map;
+    return std::tie(post_map, *span);
 }
 
 template <class ActionMap, class PostMap>
-void extract_post_history(const std::string& folder, ActionMap& actions,
+time_span extract_post_history(const std::string& folder, ActionMap& actions,
                           PostMap& post_map)
 {
     auto filename = folder + "/PostHistory.xml.xz";
@@ -191,6 +212,7 @@ void extract_post_history(const std::string& folder, ActionMap& actions,
     io::xzifstream input{filename};
     xml_text_reader reader{input, progress};
 
+    util::optional<time_span> span;
     uint64_t num_actions = 0;
     while (reader.read_next())
     {
@@ -208,7 +230,16 @@ void extract_post_history(const std::string& folder, ActionMap& actions,
         auto date = reader.attribute("CreationDate");
         auto pid = reader.attribute("PostId");
 
-        if (!uid || !type || !date)
+        if (!type || !date)
+            continue;
+
+        auto timestamp = parse_date(date->to_string());
+        if (!span)
+            span = time_span{timestamp, timestamp};
+        else
+            span->update(timestamp);
+
+        if (!uid)
             continue;
 
         user_id user{std::stoul(uid->to_string())};
@@ -233,6 +264,7 @@ void extract_post_history(const std::string& folder, ActionMap& actions,
     }
     progress.end();
     LOG(progress) << "\rFound " << num_actions << " history actions\n" << ENDLG;
+    return *span;
 }
 
 struct sequence_stats
@@ -384,10 +416,17 @@ int main(int argc, char** argv)
     }
 
     hashing::probe_map<user_id, std::vector<action>> user_map;
+    util::optional<time_span> span;
     {
-        auto post_map = extract_posts(folder, user_map);
-        extract_comments(folder, user_map, post_map);
-        extract_post_history(folder, user_map, post_map);
+        auto post_map_and_span = extract_posts(folder, user_map);
+        auto& post_map = std::get<0>(post_map_and_span);
+        span = std::get<1>(post_map_and_span);
+
+        auto comment_span = extract_comments(folder, user_map, post_map);
+        span->update(comment_span);
+
+        auto history_span = extract_post_history(folder, user_map, post_map);
+        span->update(history_span);
     }
 
     auto actions = std::move(user_map).extract();
@@ -398,29 +437,20 @@ int main(int argc, char** argv)
               });
 
     LOG(info) << "Sorting sequences..." << ENDLG;
-    sys_milliseconds first_action{
-        milliseconds{std::numeric_limits<milliseconds::rep>::max()}};
-    sys_milliseconds last_action{
-        milliseconds{std::numeric_limits<milliseconds::rep>::lowest()}};
     for (auto& pr : actions)
-    {
         std::sort(pr.second.begin(), pr.second.end());
-
-        first_action = std::min(pr.second.front().date, first_action);
-        last_action = std::max(pr.second.back().date, last_action);
-    }
     LOG(info) << "Time span: ["
-              << date::format("%Y-%m-%dT%H:%M:%S", first_action) << ", "
-              << date::format("%Y-%m-%dT%H:%M:%S", last_action) << "]" << ENDLG;
+              << date::format("%Y-%m-%dT%H:%M:%S", span->earliest) << ", "
+              << date::format("%Y-%m-%dT%H:%M:%S", span->latest) << "]" << ENDLG;
 
-    auto diff = last_action - first_action;
+    auto diff = span->latest - span->earliest;
     auto num_files = static_cast<std::size_t>(diff / time_slice + 1);
 
     std::vector<slice> slices(num_files);
     sequence_stats stats;
     for (const auto& pr : actions)
     {
-        partition_sequences(slices, pr.second, stats, first_action, time_slice);
+        partition_sequences(slices, pr.second, stats, span->earliest, time_slice);
     }
 
     for (std::size_t i = 0; i < num_files; ++i)

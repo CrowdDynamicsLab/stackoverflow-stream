@@ -23,6 +23,22 @@ target_include_directories(extract-sequences PRIVATE
     ${PROJECT_SOURCE_DIR}/include)
 target_compile_definitions(extract-sequences PRIVATE ${LIBXML2_DEFINITIONS})
 
+add_executable(extract-health src/extract_health.cpp)
+target_link_libraries(extract-health meta-io meta-stats ${LIBXML2_LIBRARIES})
+target_include_directories(extract-health PRIVATE
+    ${LIBXML2_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/deps/date
+    ${PROJECT_SOURCE_DIR}/include)
+target_compile_definitions(extract-health PRIVATE ${LIBXML2_DEFINITIONS})
+
+add_executable(extract-tags-and-votes src/extract_tags_and_votes.cpp)
+target_link_libraries(extract-tags-and-votes meta-io meta-stats ${LIBXML2_LIBRARIES})
+target_include_directories(extract-tags-and-votes PRIVATE
+    ${LIBXML2_INCLUDE_DIR}
+    ${PROJECT_SOURCE_DIR}/deps/date
+    ${PROJECT_SOURCE_DIR}/include)
+target_compile_definitions(extract-tags-and-votes PRIVATE ${LIBXML2_DEFINITIONS})
+
 add_executable(cluster-sequences src/cluster_sequences.cpp)
 target_link_libraries(cluster-sequences meta-sequence meta-hmm)
 

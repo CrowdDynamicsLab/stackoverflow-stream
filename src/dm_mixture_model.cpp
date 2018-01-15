@@ -351,14 +351,16 @@ int main(int argc, char** argv)
     LOG(info) << "Read " << total_sessions << " sessions from "
               << training.size() << " networks" << ENDLG;
 
-    random::xoroshiro128 rng{std::random_device{}()};
+    random::xoroshiro128 rng{mix_config->get_as<uint64_t>("seed").value_or(42)};
     dm_mixture_model model{training, options, rng};
     model.run(training, mix_config->get_as<uint64_t>("max-iter").value_or(1000),
               rng);
 
+    auto dir = mix_config->get_as<std::string>("prefix").value_or("dmmm-model");
+    filesystem::make_directories(dir);
+
     LOG(info) << "Saving estimate based on final chain sample..." << ENDLG;
-    model.save(
-        mix_config->get_as<std::string>("prefix").value_or("dmmm-model"));
+    model.save(dir);
 
     return 0;
 }

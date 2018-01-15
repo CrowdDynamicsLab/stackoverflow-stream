@@ -132,4 +132,24 @@ inline sys_milliseconds parse_date(const std::string& date)
     return tp;
 }
 
+struct time_span
+{
+    sys_milliseconds earliest;
+    sys_milliseconds latest;
+
+    void update(sys_milliseconds timestamp)
+    {
+        if (earliest > timestamp)
+            earliest = timestamp;
+        if (latest < timestamp)
+            latest = timestamp;
+    }
+
+    void update(const time_span& other)
+    {
+        update(other.earliest);
+        update(other.latest);
+    }
+};
+
 #endif

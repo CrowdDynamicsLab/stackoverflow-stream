@@ -1,5 +1,7 @@
 [dm-mixture-model]
 topics = 5
-max-iter = 200 # the sampler converges relatively quickly
-alpha = 10
+max-iter = 100 # the sampler converges relatively quickly
+alpha = 10.0 # 50 / K
 beta = 0.1
+prefix = "monthly-dmmm-5-v3"
+seed = 1038478590
