@@ -291,12 +291,7 @@ void partition_sequences(std::vector<slice>& slices,
     for (const auto& act : actions)
     {
         auto gap = act.date - last->date;
-        if (&act != last)
-        {
-            stats.gap_length.add(duration_cast<seconds>(gap).count());
-        }
-
-        if (act.date - last->date > hours{6})
+        if (gap > hours{6})
         {
             last = &act;
             sequences.emplace_back(begin, last);
@@ -304,6 +299,10 @@ void partition_sequences(std::vector<slice>& slices,
         }
         else
         {
+            if (&act != last)
+            {
+                stats.gap_length.add(duration_cast<minutes>(gap).count());
+            }
             last = &act;
         }
     }

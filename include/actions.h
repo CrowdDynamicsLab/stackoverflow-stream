@@ -154,6 +154,8 @@ meta::util::optional<action_type> comment_type(post_id post, user_id user,
                                : action_type::COMMENT_OA_OQ;
                 }
             }
+        default:
+            return meta::util::nullopt;
     }
 }
 
@@ -184,6 +186,8 @@ inline action_type action_cast(history_type_id id, content_type type)
                     return action_type::EDIT_MA;
                 case content_type::OTHER_ANSWER:
                     return action_type::EDIT_OA;
+                default:
+                    throw std::out_of_range{"invalid edit type"};
             }
         // vote for moderation
         case 10:
